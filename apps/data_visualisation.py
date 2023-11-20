@@ -52,46 +52,16 @@ layout = html.Div([
                      'justifyContent': 'center',
                      'alignItems': 'center',
                      'height': '60vh'}),
-    dcc.Graph(
-        id='bar-chart',
-        figure={
-            'data': [
-                {'x': normalized_avg_df.index, 'y': normalized_avg_df['UTCI'], 'type': 'bar', 'name': 'UTCI'},
-                {'x': normalized_avg_df.index, 'y': normalized_avg_df['GWP'], 'type': 'bar', 'name': 'GWP'},
-                {'x': normalized_avg_df.index, 'y': normalized_avg_df['LCC'], 'type': 'bar', 'name': 'LCC'}
-            ],
-            'layout': {
-                'title':
-                    {
-                        'text': 'Einordnung der cluster',
-                        'font':
-                            {
-                                'size': 24,
-                                'color': 'black',
-                                'family': 'Arial, sans-serif',
-                                'weight': 'bold',
-                            }
-                    },
-                'xaxis': {
-                    'title': 'Clusternummer'
-                },
-                'yaxis': {
-                    'title': 'Ereignis der Aspekte',
-                    'tickvals': [0, 0.5, 1],
-                    'ticktext': ['Gut', 'Mittel', 'Schlecht']
-                }
-            }
-        }
-    ),
-
+    dcc.Graph(id='bar-chart'),
     dcc.Dropdown(
         id='cluster-dropdown',
         options=[{'label': f"Cluster {cluster}", 'value': cluster} for cluster in clusters],
-        value=clusters[0],
+        value=[clusters[0]],
+        multi=True,
         clearable=False
     ),
-
-    dcc.Graph(id='box-plot', style={'marginBottom': '60px'}),
+    html.Div(id='box-plots-container', style={'marginBottom': '60px'})
+    ,
 
     html.Div(children='Input your value', style={'height': '50px', 'fontSize': '24px', 'textAlign': 'center'}),
     html.Div([
@@ -171,47 +141,83 @@ def update_3d_mesh_plot(relayoutData):
 
 
 @app.callback(
-    dash.dependencies.Output('box-plot', 'figure'),
+    dash.dependencies.Output('bar-chart', 'figure'),
     [dash.dependencies.Input('cluster-dropdown', 'value')]
 )
-def update_box_plot(selected_cluster):
-    traces = []
+def update_bar_chart(selected_clusters):
+    bar_data = []
 
-    for parameter in parameters:
-        traces.append(
-            go.Scatter(
-                x=[parameter, parameter],
-                y=[0, 1],
-                mode='lines',
-                line=dict(color='lightgrey', width=1),
-                showlegend=False
+    # 为每个指标分配一个颜色
+    indicator_colors = {
+        'UTCI': 'red',
+        'GWP': 'green',
+        'LCC': 'blue'
+    }
+
+    legend_added = {indicator: False for indicator in indicators}
+
+    for cluster in normalized_avg_df.index:
+        for indicator in indicators:
+            # 当前指标的默认颜色
+            show_legend = not legend_added[indicator]
+            color = indicator_colors[indicator] if cluster in selected_clusters else 'rgba(204, 204, 204, 0.7)'
+            bar_data.append(
+                go.Bar(
+                    x=[f"Cluster{cluster}"],
+                    y=[normalized_avg_df.loc[cluster, indicator]],
+                    name=indicator,
+                    marker_color=color,
+                    showlegend=show_legend
+                )
             )
-        )
-
-    cluster_df = df_normalized[df['cluster'] == selected_cluster]
-
-    for parameter in parameters:
-        traces.append(
-            go.Box(
-                y=cluster_df[parameter],
-                name=parameter,
-                boxpoints='all',
-                jitter=0.3,
-                pointpos=-1.8,
-                showlegend=False
-            )
-        )
+            legend_added[indicator] = True
 
     return {
-        'data': traces,
-        'layout': go.Layout(
-            title=dict(text=f"Box plots for Cluster {selected_cluster}", font=dict(size=24,
-                                                                                   color='black',
-                                                                                   family='Arial, sans-serif',
-                                                                                   )),
-            yaxis=dict(title="Value", tickvals=[0, 0.5, 1], ticktext=['Niedrig', 'Mittel', 'Hoch'])
-        )
+        'data': bar_data,
+        'layout': {
+            'title': {'text': 'Einordnung der cluster',
+                      'font':
+                          {
+                              'size': 24,
+                              'color': 'black',
+                              'family': 'Arial, sans-serif',
+                              'weight': 'bold'
+                          }},
+            'xaxis': {'title': 'Cluster'},
+            'yaxis': {
+                'title': 'Ereignis der Aspekte',
+                'tickvals': [0, 0.5, 1],
+                'ticktext': ['Gut', 'Mittel', 'Schlecht']
+            },
+            'barmode': 'group',
+            'bargap': 0.000001,
+            'bargroupgap': 0.001,
+
+        }
     }
+
+
+@app.callback(
+    dash.dependencies.Output('box-plots-container', 'children'),
+    [dash.dependencies.Input('cluster-dropdown', 'value')]
+)
+def update_box_plots(selected_clusters):
+    filtered_df = df_normalized[df['cluster'].isin(selected_clusters)]
+    traces = [go.Box(y=filtered_df[parameter], name=parameter, boxpoints='all', jitter=0.3, pointpos=-1.8) for parameter
+              in parameters]
+
+    return dcc.Graph(
+        figure={
+            'data': traces,
+            'layout': go.Layout(
+                title=dict(text="Box Plots for Selected Clusters", font={'size': 24, 'color': "black",
+                                                                         'family': "Arial,sans-serif"}),
+                yaxis=dict(title="Normalized Value", tickvals=[0, 0.5, 1], ticktext=['Low', 'Medium', 'High']),
+                xaxis=dict(title="Parameters"),
+                showlegend=False
+            )
+        }
+    )
 
 
 @app.callback(

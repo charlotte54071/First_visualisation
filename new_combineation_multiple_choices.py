@@ -47,7 +47,7 @@ app.layout = html.Div([
         multi=True,
         clearable=False
     ),
-    html.Div(id='box-plots-container')
+    html.Div(id='box-plots-container',style={'marginBottom': '60px'})
 ])
 
 

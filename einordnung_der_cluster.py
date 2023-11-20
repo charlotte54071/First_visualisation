@@ -1,6 +1,7 @@
 from dash import Dash, dcc, html
 import pandas as pd
 import plotly.graph_objs as go
+from dash.dependencies import Input, Output
 
 # 尝试加载 Excel 数据
 try:

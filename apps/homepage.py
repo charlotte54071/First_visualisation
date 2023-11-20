@@ -1,4 +1,4 @@
-# apps/app1.py
+# apps/homepage.py
 from dash import html
 
 layout = html.Div([
