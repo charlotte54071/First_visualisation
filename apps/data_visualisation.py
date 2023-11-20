@@ -42,8 +42,9 @@ clusters = sorted(df['cluster'].unique())
 
 layout = html.Div([
     html.Div([
-        dcc.Link('Back to homepage', href='/app1', style={'fontSize': 18, 'textAlign': 'center', 'family': 'Arial, '
-                                                                                                           'sans-serif'}),
+        dcc.Link('Back to homepage', href='/homepage', style={'fontSize': 18, 'textAlign': 'center', 'family': 'Arial, '
+                                                                                                               'sans'
+                                                                                                               '-serif'}),
         # add back link
         html.Br(),  # add the change line
     ]),
@@ -58,17 +59,18 @@ layout = html.Div([
         options=[{'label': f"Cluster {cluster}", 'value': cluster} for cluster in clusters],
         value=[clusters[0]],
         multi=True,
-        clearable=False
+        clearable=False,
+        style={'marginBottom': '24px'}
     ),
-    html.Div(id='box-plots-container', style={'marginBottom': '60px'})
-    ,
+    html.Div(id='box-plots-container', style={'marginBottom': '60px'}),
 
     html.Div(children='Input your value', style={'height': '50px', 'fontSize': '24px', 'textAlign': 'center'}),
     html.Div([
         html.Div([
-            html.Div([
-                html.Label(param, style={'fontSize': '20px', 'marginRight': '15px'}),
-            ], style={'width': '300px', 'display': 'inline-block', 'textAlign': 'right'}),
+            html.Div(
+                [
+                    html.Label(param, style={'fontSize': '20px', 'marginRight': '15px'}),
+                ], style={'width': '300px', 'display': 'inline-block', 'textAlign': 'right'}),
             dcc.Input(id=f'input-{param}', type='number', step='any', value=0 if not df.empty else 0,
                       style={'fontSize': '16px', 'width': '100px', 'display': 'inline-block'})
         ], style={'display': 'flex', 'alignItems': 'center', 'marginBottom': '15px'})
@@ -198,45 +200,66 @@ def update_bar_chart(selected_clusters):
 
 
 @app.callback(
-    dash.dependencies.Output('box-plots-container', 'children'),
-    [dash.dependencies.Input('cluster-dropdown', 'value')]
+    [dash.dependencies.Output('box-plots-container', 'children'),
+     dash.dependencies.Output('best-cluster-output', 'children')],
+    [dash.dependencies.Input('cluster-dropdown', 'value'),
+     dash.dependencies.Input('submit-button', 'n_clicks')],
+    [dash.dependencies.State(f'input-{param}', 'value') for param in parameters]
 )
-def update_box_plots(selected_clusters):
-    filtered_df = df_normalized[df['cluster'].isin(selected_clusters)]
-    traces = [go.Box(y=filtered_df[parameter], name=parameter, boxpoints='all', jitter=0.3, pointpos=-1.8) for parameter
-              in parameters]
+def combined_callback(selected_clusters, n_clicks, *values):
+    ctx = dash.callback_context
+    if not ctx.triggered:
+        return dash.no_update, dash.no_update
 
-    return dcc.Graph(
+    trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
+    button_clicked = n_clicks and n_clicks > 0
+
+    # Processing and normalizing user input
+    input_values = {param: value for param, value in zip(parameters, values)}
+    all_values_provided = all(value is not None for value in input_values.values())
+
+    # Normalize user inputs or set to zero if not provided
+    normalized_input_values = {param: (value - min_vals[param]) / (max_vals[param] - min_vals[param]) if value is not None else 0 for param, value in input_values.items()} if button_clicked else {}
+
+    if trigger_id == 'submit-button' and button_clicked:
+        if not all_values_provided or df.empty:
+            return dash.no_update, "Please ensure all fields are filled before clicking 'Find Best Cluster'."
+
+        differences = df[parameters].apply(lambda row: sum((row - pd.Series(input_values)) ** 2), axis=1)
+        best_cluster = df.loc[differences.idxmin(), 'cluster']
+        best_cluster_output = f'The most suitable cluster for the given parameters is: Cluster {best_cluster}'
+    else:
+        best_cluster_output = dash.no_update
+
+    # Update Box Plot chart
+    filtered_df = df_normalized[df['cluster'].isin(selected_clusters)]
+    traces = []
+    for parameter in parameters:
+        traces.append(go.Box(y=filtered_df[parameter], name=parameter, boxpoints='all', jitter=0.3, pointpos=-1.8))
+        # Add red dots to denote the normalized values of user input if the submit button has been clicked at least once
+        if button_clicked:
+            user_input_normalized = normalized_input_values.get(parameter, 0)
+            traces.append(go.Scatter(x=[parameter], y=[user_input_normalized], mode='markers', marker=dict(color='red', size=10)))
+
+    box_plot = dcc.Graph(
         figure={
             'data': traces,
             'layout': go.Layout(
-                title=dict(text="Box Plots for Selected Clusters", font={'size': 24, 'color': "black",
-                                                                         'family': "Arial,sans-serif"}),
+                title=dict(text="Box Plots for Selected Clusters",
+                           font={'size': 24, 'color': "black", 'family': "Arial, sans-serif"}),
                 yaxis=dict(title="Normalized Value", tickvals=[0, 0.5, 1], ticktext=['Low', 'Medium', 'High']),
                 xaxis=dict(title="Parameters"),
-                showlegend=False
+                showlegend=False,
+                margin=dict(l=80, r=40, t=40, b=120),  # Fixed margins
+                height=600,  # Fixed height
+                width=1500  # Fixed width
             )
         }
     )
+    return box_plot, best_cluster_output
 
 
-@app.callback(
-    dash.dependencies.Output('best-cluster-output', 'children'),
-    [dash.dependencies.Input('submit-button', 'n_clicks')],  # only care about the button
-    [dash.dependencies.State(f'input-{param}', 'value') for param in parameters]
-    # Use State to get the current value of an input field without triggering a callback
-)
-def find_best_cluster(n_clicks, *values):
-    # If the button has not been clicked, or the data frame is empty, no calculation is performed.
-    if n_clicks is None or df.empty:
-        return "Please enter the values and click 'Find Best Cluster'."
 
-    input_values = {param: value for param, value in zip(parameters, values)}
 
-    if any(value is None for value in input_values.values()):
-        return "Please make sure all fields are filled before clicking 'Find Best Cluster'."
 
-    differences = df[parameters].apply(lambda row: sum((row - pd.Series(input_values)) ** 2), axis=1)
-    best_cluster = df.loc[differences.idxmin(), 'cluster']
 
-    return f'The most suitable cluster for the given parameters is: Cluster {best_cluster}'
