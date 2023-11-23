@@ -3,7 +3,7 @@ from dash import html, dcc
 from dash.dependencies import Input, Output
 
 from app import app
-import apps.homepage, apps.data_visualisation  # 引入app1和app2
+import apps.homepage, apps.data_visualisation_house, apps.data_visualisation_room, apps.data_visualisation_city
 
 app.layout = html.Div([
     dcc.Location(id='url', refresh=False),
@@ -18,7 +18,11 @@ def display_page(pathname):
         if pathname == '/app1':
             return apps.homepage.layout
         elif pathname == '/app2':
-            return apps.data_visualisation.layout
+            return apps.data_visualisation_house.layout
+        elif pathname == '/app3':
+            return apps.data_visualisation_city.layout
+        elif pathname == '/app4':
+            return apps.data_visualisation_room.layout
         else:
             return apps.homepage.layout  # default 'app1'
     except Exception as e:

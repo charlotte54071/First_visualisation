@@ -6,7 +6,7 @@ from app import app
 
 # Read data from the Excel file
 try:
-    df = pd.read_excel('dash_visu_export.xlsx', sheet_name='Sheet1')
+    df = pd.read_excel('dash_visu_export_city.xlsx', sheet_name='Sheet1')
     if not all(column in df.columns for column in ['UTCI', 'GWP', 'LCC', 'cluster']):
         raise ValueError("Some essential columns are missing from the Excel sheet.")
 except Exception as e:
@@ -48,21 +48,21 @@ layout = html.Div([
         # add back link
         html.Br(),  # add the change line
     ]),
-    dcc.Graph(id='3d-mesh-plot',
+    dcc.Graph(id='3d-mesh-plot-2',
               style={'display': 'flex',
                      'justifyContent': 'center',
                      'alignItems': 'center',
                      'height': '60vh'}),
-    dcc.Graph(id='bar-chart'),
+    dcc.Graph(id='bar-chart-2'),
     dcc.Dropdown(
-        id='cluster-dropdown',
+        id='cluster-dropdown-2',
         options=[{'label': f"Cluster {cluster}", 'value': cluster} for cluster in clusters],
         value=[clusters[0]],
         multi=True,
         clearable=False,
         style={'marginBottom': '24px'}
     ),
-    html.Div(id='box-plots-container', style={'marginBottom': '60px'}),
+    html.Div(id='box-plots-container-2', style={'marginBottom': '60px'}),
 
     html.Div(children='Input your value', style={'height': '50px', 'fontSize': '24px', 'textAlign': 'center'}),
     html.Div([
@@ -77,15 +77,15 @@ layout = html.Div([
         for param in parameters
     ], style={'textAlign': 'center', 'marginBottom': '20px'}),
 
-    html.Button('Find Best Cluster', id='submit-button', style={'fontSize': '20px', 'lineHeight': '1.25'}),
-    html.Div(id='best-cluster-output', style={'fontSize': '20px', 'textAlign': 'center'})
+    html.Button('Find Best Cluster', id='submit-button-2', style={'fontSize': '20px', 'lineHeight': '1.25'}),
+    html.Div(id='best-cluster-output-2', style={'fontSize': '20px', 'textAlign': 'center'})
 
 ])
 
 
 @app.callback(
-    dash.dependencies.Output('3d-mesh-plot', 'figure'),
-    [dash.dependencies.Input('3d-mesh-plot', 'relayoutData')]
+    dash.dependencies.Output('3d-mesh-plot-2', 'figure'),
+    [dash.dependencies.Input('3d-mesh-plot-2', 'relayoutData')]
 )
 def update_3d_mesh_plot(relayoutData):
     if df.empty:
@@ -143,8 +143,8 @@ def update_3d_mesh_plot(relayoutData):
 
 
 @app.callback(
-    dash.dependencies.Output('bar-chart', 'figure'),
-    [dash.dependencies.Input('cluster-dropdown', 'value')]
+    dash.dependencies.Output('bar-chart-2', 'figure'),
+    [dash.dependencies.Input('cluster-dropdown-2', 'value')]
 )
 def update_bar_chart(selected_clusters):
     bar_data = []
@@ -200,10 +200,10 @@ def update_bar_chart(selected_clusters):
 
 
 @app.callback(
-    [dash.dependencies.Output('box-plots-container', 'children'),
-     dash.dependencies.Output('best-cluster-output', 'children')],
-    [dash.dependencies.Input('cluster-dropdown', 'value'),
-     dash.dependencies.Input('submit-button', 'n_clicks')],
+    [dash.dependencies.Output('box-plots-container-2', 'children'),
+     dash.dependencies.Output('best-cluster-output-2', 'children')],
+    [dash.dependencies.Input('cluster-dropdown-2', 'value'),
+     dash.dependencies.Input('submit-button-2', 'n_clicks')],
     [dash.dependencies.State(f'input-{param}', 'value') for param in parameters]
 )
 def combined_callback(selected_clusters, n_clicks, *values):
